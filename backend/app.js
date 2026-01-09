@@ -271,3 +271,19 @@ app.post('/logout', (req, res) => {
 app.listen(port, () => {
     console.log("working on", port);
 })
+
+
+
+
+
+
+
+
+
+const expenseV2Routes = require("./routes/expenseV2Routes");
+app.use("/api/v2", expenseV2Routes);
+
+
+const balanceV2Routes = require("./routes/balanceV2Routes");
+app.use("/api/v2", balanceV2Routes);
+
