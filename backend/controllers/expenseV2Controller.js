@@ -43,18 +43,23 @@ exports.createExpenseV2 = async (req, res) => {
         });
 
         // -------- STEP 2: CREATE LEDGER ENTRY (NEW SYSTEM) --------
-        await LedgerEntry.create({
-            groupId,
-            type: "EXPENSE_CREATED",
-            actor: payer,
-            data: {
-                payer,
-                participants: Object.keys(splits),
-                splits,
-                amount: totalAmount,
-                referenceId: expense._id
-            }
-        });
+        try {
+  await LedgerEntry.create({
+    groupId,
+    type: "EXPENSE_CREATED",
+    actor: payer,
+    data: {
+      payer,
+      participants: Object.keys(splits),
+      splits,
+      amount: totalAmount,
+      referenceId: expense._id
+    }
+  });
+} catch (err) {
+  // Duplicate key error (idempotency)
+  if (err.code !== 11000) throw err;
+}
 
         // -------- RESPONSE --------
         return res.status(201).json({

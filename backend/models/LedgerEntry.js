@@ -55,4 +55,9 @@ const ledgerEntrySchema = new mongoose.Schema(
   timestamps: true
 }
 );
+ledgerEntrySchema.index(
+  { groupId: 1, type: 1, "data.referenceId": 1 },
+  { unique: true, partialFilterExpression: { type: "EXPENSE_CREATED" } }
+);
+
 module.exports = mongoose.model("LedgerEntry", ledgerEntrySchema);
