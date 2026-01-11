@@ -2,9 +2,13 @@ const mongoose = require("mongoose");
 
 const Expense = require("../models/transaction");
 const LedgerEntry = require("../models/LedgerEntry");
+const Group = require("../models/group");
+
 exports.createExpenseV2 = async (req, res) => {
     try {
-        const { groupId, title, payer, splits } = req.body;
+        const groupId = req.params.groupId || req.body.groupId;
+        const { title, payer, splits } = req.body;
+
 
         // -------- VALIDATION (DO NOT SKIP) --------
         if (!groupId || !title || !payer || !splits) {
@@ -14,6 +18,32 @@ exports.createExpenseV2 = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(groupId)) {
             return res.status(400).json({ message: "Invalid groupId" });
         }
+
+        const group = await Group.findById(groupId);
+if (!group) {
+  return res.status(404).json({ message: "Group not found" });
+}
+
+const userId = req.user._id.toString();
+
+// requester must be group member
+if (!group.members.some(m => m.toString() === userId)) {
+  return res.status(403).json({ message: "You are not a member of this group" });
+}
+
+// payer must be member
+if (!group.members.some(m => m.toString() === payer)) {
+  return res.status(400).json({ message: "Payer must be a group member" });
+}
+
+// all participants must be members
+const participantIds = Object.keys(splits);
+for (const pid of participantIds) {
+  if (!group.members.some(m => m.toString() === pid)) {
+    return res.status(400).json({ message: `Invalid participant: ${pid}` });
+  }
+}
+
 
         if (!mongoose.Types.ObjectId.isValid(payer)) {
             return res.status(400).json({ message: "Invalid payer userId" });
@@ -44,22 +74,22 @@ exports.createExpenseV2 = async (req, res) => {
 
         // -------- STEP 2: CREATE LEDGER ENTRY (NEW SYSTEM) --------
         try {
-  await LedgerEntry.create({
-    groupId,
-    type: "EXPENSE_CREATED",
-    actor: payer,
-    data: {
-      payer,
-      participants: Object.keys(splits),
-      splits,
-      amount: totalAmount,
-      referenceId: expense._id
-    }
-  });
-} catch (err) {
-  // Duplicate key error (idempotency)
-  if (err.code !== 11000) throw err;
-}
+            await LedgerEntry.create({
+                groupId,
+                type: "EXPENSE_CREATED",
+                actor: payer,
+                data: {
+                    payer,
+                    participants: Object.keys(splits),
+                    splits,
+                    amount: totalAmount,
+                    referenceId: expense._id
+                }
+            });
+        } catch (err) {
+            // Duplicate key error (idempotency)
+            if (err.code !== 11000) throw err;
+        }
 
         // -------- RESPONSE --------
         return res.status(201).json({

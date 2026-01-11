@@ -78,17 +78,18 @@ app.get("/entry", authenticate, async (req, res) => {
 
 
 
-app.get('/me', authenticate, (req, res) => {
-    const token = req.cookies.token;
-    if (!token) return res.status(401).json({ loggedIn: false });
+app.get("/me", (req, res) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ loggedIn: false });
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); 
-        res.json({ loggedIn: true, user: decoded });
-    } catch (err) {
-        res.status(401).json({ loggedIn: false });
-    }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return res.json({ loggedIn: true, user: decoded });
+  } catch (err) {
+    return res.status(401).json({ loggedIn: false });
+  }
 });
+
 
 app.get("/api/user/:id", async (req, res) => {
   try {
@@ -154,7 +155,7 @@ app.post("/login", async (req, res) => {
     );
 
     res.cookie("token", token, { httpOnly: true });
-    res.status(200).json({ message: "logged in successfully" });
+    res.status(200).json({ "token": token,message: "logged in successfully" });
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json("Internal Server Error");
@@ -252,25 +253,19 @@ app.post("/entry", async (req, res) => {
 
 
 
-app.post('/logout', (req, res) => {
-    
-    res.cookie('jwt', '', { 
-        httpOnly: true, // Crucial for security
-        expires: new Date(0), // Set expiration date to the past
-        secure: process.env.NODE_ENV === 'production', // Use secure in production
-        sameSite: 'strict',
-    });
-
-    res.status(200).json({ message: 'Logged out successfully.' });
-
-    
+app.post("/logout", (req, res) => {
+  res.cookie("token", "", {
+    httpOnly: true,
+    expires: new Date(0),
+    sameSite: "lax",
+  });
+  return res.status(200).json({ message: "Logged out successfully." });
 });
 
 
 
-app.listen(port, () => {
-    console.log("working on", port);
-})
+
+
 
 
 
@@ -284,6 +279,57 @@ const expenseV2Routes = require("./routes/expenseV2Routes");
 app.use("/api/v2", expenseV2Routes);
 
 
-const balanceV2Routes = require("./routes/balanceV2Routes");
-app.use("/api/v2", balanceV2Routes);
+// const balanceV2Routes = require("./routes/balanceV2Routes");
+// app.use("/api/v2", balanceV2Routes);
 
+// const expenseAdjustmentRoutes = require("./routes/groupExpenseAdjustRoutes");
+// app.use("/api/v2", expenseAdjustmentRoutes);
+
+const groupRoutes = require("./routes/groupRoutes");
+app.use("/api/v2", groupRoutes);
+
+const groupSettlementRoutes = require("./routes/groupSettlementRoutes");
+app.use("/api/v2", groupSettlementRoutes);
+
+
+// const groupInviteRoutes = require("./routes/groupInviteRoutes");
+// app.use("/api/v2", groupInviteRoutes);
+
+app.use("/api/v2/groups", require("./routes/groupInviteRoutes"));
+
+const meRoutes = require("./routes/meRoutes");
+app.use("/api/v2", meRoutes);
+
+const groupExpenseRoutes = require("./routes/groupExpenseRoutes");
+app.use("/api/v2", groupExpenseRoutes);
+
+const groupBalanceRoutes = require("./routes/groupBalanceRoutes");
+app.use("/api/v2", groupBalanceRoutes);
+
+const groupLedgerRoutes = require("./routes/groupLedgerRoutes");
+app.use("/api/v2", groupLedgerRoutes);
+
+const groupExpenseAdjustRoutes = require("./routes/groupExpenseAdjustRoutes");
+app.use("/api/v2", groupExpenseAdjustRoutes);
+
+const meGroupsRoutes = require("./routes/meGroupsRoutes");
+app.use("/api/v2", meGroupsRoutes);
+
+
+const groupMembersRoutes = require("./routes/groupMembersRoutes");
+app.use("/api/v2", groupMembersRoutes);
+
+const groupExpenseListRoutes = require("./routes/groupExpenseListRoutes");
+app.use("/api/v2", groupExpenseListRoutes);
+
+
+
+
+
+
+
+
+
+app.listen(port, () => {
+    console.log("working on", port);
+})

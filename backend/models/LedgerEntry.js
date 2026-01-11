@@ -24,27 +24,38 @@ const ledgerEntrySchema = new mongoose.Schema(
     required: true
   },
   data: {
-    payer: {
+  payer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
+  participants: [
+    {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
-    },
-    participants: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-      }
-    ],
-    splits: {
-      type: Map,
-      of: Number
-    },
-    amount: {
-      type: Number
-    },
-    referenceId: {
-      type: mongoose.Schema.Types.ObjectId
     }
+  ],
+  splits: {
+    type: Map,
+    of: Number
   },
+  amount: {
+    type: Number
+  },
+  referenceId: {
+    type: mongoose.Schema.Types.ObjectId
+  },
+
+  // ✅ NEW FOR SETTLEMENTS
+  from: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
+  to: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }
+},
+
   status: {
     type: String,
     enum: ["ACTIVE", "DISPUTED", "REVERSED"],

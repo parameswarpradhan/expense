@@ -1,4 +1,3 @@
-
 import { createContext, useState, useEffect } from "react";
 
 export const AuthContext = createContext();
@@ -8,36 +7,48 @@ export function AuthProvider({ children }) {
   const [userData, setUserData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0); 
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // ✅ ADD token support for v2 APIs
+  const [token, setToken] = useState(localStorage.getItem("token") || null);
+
+
   const url = "http://localhost:8080/";
-  
- 
+
   const triggerRefresh = () => {
-      setRefreshKey(prevKey => prevKey + 1);
+    setRefreshKey(prevKey => prevKey + 1);
   };
 
   const logout = async () => {
-        try {
-            const response = await fetch(`${url}logout`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
+    try {
+      const response = await fetch(`${url}logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
 
-            if (response.ok) {
-                setUser(null);
-                setUserData(null);
-                setTransactions([]);
-                console.log('User logged out.');
-            } else {
-                console.error('Logout failed on server side.');
-            }
-        } catch (error) {
-            console.error('Error during logout:', error);
-        }
-    };
-    
-  
+      if (response.ok) {
+        setUser(null);
+        setUserData(null);
+        setTransactions([]);
+
+        // ✅ clear token
+        localStorage.removeItem("token");
+        setToken(null);
+
+        console.log("User logged out.");
+      } else {
+        console.error("Logout failed on server side.");
+      }
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  };
+
+  // ✅ Still keep cookie-based login check
   useEffect(() => {
+    const savedToken = localStorage.getItem("token");
+    if (savedToken) setToken(savedToken);
+
     fetch(`${url}me`, { credentials: "include" })
       .then(res => res.json())
       .then(data => {
@@ -49,40 +60,35 @@ export function AuthProvider({ children }) {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [url]);
+  }, []);
 
-  
   useEffect(() => {
     if (!user?._id) {
-        // Clear data if user logs out
-        setUserData(null);
-        setTransactions([]);
-        return;
+      setUserData(null);
+      setTransactions([]);
+      return;
     }
 
     const fetchUserDetailsAndTransactions = async () => {
-        // Fetch user data
-        try {
-            const userRes = await fetch(`${url}api/user/${user._id}`);
-            const userData = await userRes.json();
-            setUserData(userData);
-        } catch (err) {
-            console.error("Error fetching user data:", err);
-        }
+      try {
+        const userRes = await fetch(`${url}api/user/${user._id}`);
+        const userData = await userRes.json();
+        setUserData(userData);
+      } catch (err) {
+        console.error("Error fetching user data:", err);
+      }
 
-        // Fetch transaction data
-        try {
-            const txRes = await fetch(`${url}api/transactions/${user._id}`);
-            const txData = await txRes.json();
-            setTransactions(txData);
-        } catch (err) {
-            console.error("Error fetching transactions:", err);
-        }
+      try {
+        const txRes = await fetch(`${url}api/transactions/${user._id}`);
+        const txData = await txRes.json();
+        setTransactions(txData);
+      } catch (err) {
+        console.error("Error fetching transactions:", err);
+      }
     };
 
     fetchUserDetailsAndTransactions();
-    
-  }, [user, refreshKey, url]); 
+  }, [user, refreshKey, url]);
 
   return (
     <AuthContext.Provider
@@ -96,7 +102,11 @@ export function AuthProvider({ children }) {
         loading,
         url,
         logout,
-        triggerRefresh 
+        triggerRefresh,
+
+        // ✅ expose token
+        token,
+        setToken,
       }}
     >
       {children}
