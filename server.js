@@ -98,9 +98,7 @@ app.get("/api/transactions/:userId", async (req, res) => {
   }
 });
 
-app.get("/api/v2/health", (req, res) => {
-  res.status(200).json({ ok: true, message: "Backend healthy ✅" });
-});
+
 
 
 
@@ -158,6 +156,7 @@ app.use("/api/v2", require("./routes/expenseV2Routes"));
 app.use("/api/v2", require("./routes/groupRoutes"));
 app.use("/api/v2", require("./routes/groupSettlementRoutes"));
 app.use("/api/v2", require("./routes/groupInviteRoutes"));
+app.use("/api/v2", require("./routes/health"));
 
 app.use("/api/v2", require("./routes/meRoutes"));
 app.use("/api/v2", require("./routes/groupExpenseRoutes"));
