@@ -22,7 +22,7 @@ export default function Login() {
         setIsSubmitting(true);
 
         try {
-            const loginResponse = await fetch(`${import.meta.env.VITE_API_URL!}/login`, {
+            const loginResponse = await fetch(`${import.meta.env.VITE_API_URL1}/login`, {
                 credentials: "include",
                 method: "POST",
                 headers: {
@@ -47,7 +47,7 @@ export default function Login() {
                 console.warn("No token received from login API");
             }
 
-            const meResponse = await fetch(import.meta.env.VITE_API_URL1, {
+            const meResponse = await fetch(`${import.meta.env.VITE_API_URL1}/me`, {
                 method: "GET",
                 credentials: "include"
             });
