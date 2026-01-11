@@ -19,6 +19,7 @@ router.get("/health/db", async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+});
 router.get("/health/env", (req, res) => {
   res.json({
     ok: true,
@@ -26,6 +27,5 @@ router.get("/health/env", (req, res) => {
     hasJwt: !!process.env.JWT_SECRET,
     clientUrl: process.env.CLIENT_URL
   });
-});
 
 module.exports = router;
