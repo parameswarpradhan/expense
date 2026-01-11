@@ -3,7 +3,8 @@ import { StrictMode, useContext } from 'react'
 import App from './App.jsx'
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
-import router from "/Users/parameswarpradhan/Documents/coding/track expense/frontend/src/Routing/router.jsx"
+import router from "./Routing/router.jsx";
+
 import { AuthProvider } from "./Context/AuthContext.jsx";
 // import { useContext } from 'react';
 
