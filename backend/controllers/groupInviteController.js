@@ -1,73 +1,60 @@
-const crypto = require("crypto");
 const Group = require("../models/group");
+const crypto = require("crypto");
 
-function generateToken() {
-  return crypto.randomBytes(16).toString("hex"); // 32 chars
-}
-
-// ✅ Owner generates invite link
-exports.createInviteLink = async (req, res) => {
+// ✅ Generate invite
+exports.generateInviteLink = async (req, res) => {
   try {
     const { groupId } = req.params;
-
-    // ✅ SAFELY GET USER ID
-    const userId =
-      req.user?._id?.toString() ||
-      req.user?.id?.toString() ||
-      req.userId?.toString();
-
-    if (!userId) {
-      return res.status(401).json({ message: "Invalid auth user" });
-    }
 
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    if (!group.owner) {
-      return res.status(400).json({ message: "Group owner not set" });
-    }
+    // ✅ only owner can generate invite (optional)
+    // if (group.owner.toString() !== req.user._id.toString()) {
+    //   return res.status(403).json({ message: "Only owner can invite" });
+    // }
 
-    if (group.owner.toString() !== userId) {
-      return res.status(403).json({ message: "Only owner can generate invite link" });
-    }
+    // ✅ simple token
+    const token = crypto.randomBytes(8).toString("hex");
 
-    if (!group.inviteToken) {
-      group.inviteToken = generateToken();
-      await group.save();
-    }
+    group.inviteToken = token;
+    await group.save();
 
     return res.status(200).json({
-      inviteLink: `/join/${group.inviteToken}`,
-      token: group.inviteToken
+      message: "Invite generated",
+      inviteLink: `/join/${token}`,
+      token,
     });
-
   } catch (err) {
-    console.error("Invite link error:", err);
+    console.error("generateInviteLink error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-
-// ✅ User joins group using invite token
-exports.joinGroupViaInvite = async (req, res) => {
+// ✅ Join by token
+exports.joinGroupByInvite = async (req, res) => {
   try {
     const { token } = req.params;
-    const userId = req.user._id;
 
-    const group = await Group.findOne({ inviteToken: token, inviteEnabled: true });
-    if (!group) return res.status(404).json({ message: "Invalid or expired invite link" });
+    const group = await Group.findOne({ inviteToken: token });
+    if (!group) return res.status(404).json({ message: "Invalid invite token" });
 
-    const alreadyMember = group.members.some(m => m.toString() === userId);
-    if (alreadyMember) {
-      return res.status(200).json({ message: "Already a member", groupId: group._id });
+    const userId = req.user._id.toString();
+
+    // ✅ already member
+    if (group.members.some((m) => m.toString() === userId)) {
+      return res.status(200).json({ message: "Already member", groupId: group._id });
     }
 
     group.members.push(userId);
     await group.save();
 
-    return res.status(200).json({ message: "Joined group successfully", groupId: group._id });
+    return res.status(200).json({
+      message: "Joined group successfully",
+      groupId: group._id,
+    });
   } catch (err) {
-    console.error("Join group error:", err);
+    console.error("joinGroupByInvite error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };

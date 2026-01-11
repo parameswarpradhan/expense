@@ -1,13 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const {
-  createInviteLink,
-  joinGroupViaInvite
-} = require("../controllers/groupInviteController");
 const auth = require("../middleware/auth");
 
-// REMOVE "groups" FROM HERE
-router.post("/:groupId/invite", auth, createInviteLink);
-router.post("/join/:token", auth, joinGroupViaInvite);
+const {
+  generateInviteLink,
+  joinGroupByInvite,
+} = require("../controllers/groupInviteController");
+
+router.post("/groups/:groupId/invite", auth, generateInviteLink);
+router.post("/groups/join/:token", auth, joinGroupByInvite);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const LedgerEntry = require("../models/LedgerEntry");
 const Group = require("../models/group");
+const SettlementRequest = require("../models/SettlementRequest");
 
 exports.getSettlements = async (req, res) => {
   try {
@@ -11,51 +12,58 @@ exports.getSettlements = async (req, res) => {
     }
 
     // ✅ Load group + members
-    const group = await Group.findById(groupId).populate("members", "username email");
+    const group = await Group.findById(groupId).populate(
+      "members",
+      "username email"
+    );
+
     if (!group) return res.status(404).json({ message: "Group not found" });
 
-    // ✅ Map userId -> username
+    // ✅ member map
     const memberMap = {};
     group.members.forEach((m) => {
       memberMap[m._id.toString()] = m.username;
     });
 
-    // ✅ Ledger includes settlements
+    // ✅ Load ledger entries for balances
     const ledgerEntries = await LedgerEntry.find({
       groupId,
       status: "ACTIVE",
       type: { $in: ["EXPENSE_CREATED", "SETTLEMENT_COMPLETED"] },
     });
 
+    // ✅ Compute balances
     const balances = {};
 
     for (const entry of ledgerEntries) {
-      // ✅ Expense
+      // ✅ EXPENSE CREATED
       if (entry.type === "EXPENSE_CREATED") {
-        const payerId = entry.data?.payer?.toString();
-        const amount = Number(entry.data?.amount || 0);
+        const { payer, splits, amount } = entry.data;
 
-        if (!payerId || amount <= 0) continue;
+        const payerId = payer.toString();
+        balances[payerId] = (balances[payerId] || 0) + Number(amount);
 
-        balances[payerId] = (balances[payerId] || 0) + amount;
-
-        let splitObj = entry.data?.splits || {};
-        if (splitObj instanceof Map) splitObj = Object.fromEntries(splitObj);
+        const splitObj =
+          splits instanceof Map ? Object.fromEntries(splits) : splits;
 
         for (const userId of Object.keys(splitObj || {})) {
-          balances[userId] = (balances[userId] || 0) - Number(splitObj[userId]);
+          balances[userId] =
+            (balances[userId] || 0) - Number(splitObj[userId]);
         }
       }
 
-      // ✅ Settlement completed
-      else if (entry.type === "SETTLEMENT_COMPLETED") {
-        const fromId = entry.data?.from?.toString();
-        const toId = entry.data?.to?.toString();
-        const amt = Number(entry.data?.amount || 0);
+      // ✅ SETTLEMENT COMPLETED
+      if (entry.type === "SETTLEMENT_COMPLETED") {
+        const fromId = entry.data.from?.toString();
+        const toId = entry.data.to?.toString();
+        const amt = Number(entry.data.amount || 0);
 
-        if (!fromId || !toId || amt <= 0) continue;
+        if (!fromId || !toId || !amt) continue;
 
+        // debtor pays -> less negative
         balances[fromId] = (balances[fromId] || 0) + amt;
+
+        // creditor receives -> less positive
         balances[toId] = (balances[toId] || 0) - amt;
       }
     }
@@ -65,13 +73,57 @@ exports.getSettlements = async (req, res) => {
     const debtors = [];
 
     for (const userId in balances) {
-      const bal = Number(balances[userId] || 0);
+      const bal = balances[userId];
 
       if (bal > 0.00001) creditors.push({ userId, amount: bal });
       else if (bal < -0.00001) debtors.push({ userId, amount: Math.abs(bal) });
     }
 
-    // ✅ settlements
+    // ✅ logged user summary
+    const myId = req.user?._id?.toString();
+    const myBal = myId ? Number(balances[myId] || 0) : 0;
+
+    // =====================================================
+    // ✅ Pending requests
+    // =====================================================
+    const pendingRequests = await SettlementRequest.find({
+      groupId,
+      status: "PENDING",
+    }).populate("from to", "username");
+
+    // ✅ create lookup for pending: from-to-amount
+    const pendingLookup = new Map();
+    pendingRequests.forEach((p) => {
+      const fromId = p.from._id.toString();
+      const toId = p.to._id.toString();
+      const amt = Math.round(Number(p.amount) * 100) / 100;
+      const key = `${fromId}-${toId}-${amt}`;
+      pendingLookup.set(key, p._id.toString());
+    });
+
+    const pending = pendingRequests.map((p) => {
+      const fromId = p.from._id.toString();
+      const toId = p.to._id.toString();
+      const amt = Math.round(Number(p.amount) * 100) / 100;
+
+      return {
+        _id: p._id,
+        fromId,
+        fromName: p.from.username,
+        toId,
+        toName: p.to.username,
+        amount: amt,
+        confirmStatus: p.status,
+
+        // ✅ permissions
+        canConfirm: myId === toId, // receiver can confirm/reject
+        canRequest: myId === fromId, // debtor created it
+      };
+    });
+
+    // =====================================================
+    // ✅ Settlement suggestions (ENRICHED)
+    // =====================================================
     const settlements = [];
     let i = 0,
       j = 0;
@@ -79,14 +131,30 @@ exports.getSettlements = async (req, res) => {
     while (i < debtors.length && j < creditors.length) {
       const pay = Math.min(debtors[i].amount, creditors[j].amount);
 
+      const fromId = debtors[i].userId;
+      const toId = creditors[j].userId;
+      const roundedAmount = Math.round(pay * 100) / 100;
+
+      // ✅ check if pending exists already
+      const key = `${fromId}-${toId}-${roundedAmount}`;
+      const pendingId = pendingLookup.get(key) || null;
+
       settlements.push({
-        fromId: debtors[i].userId,
-        fromName: memberMap[debtors[i].userId] || debtors[i].userId,
+        fromId,
+        fromName: memberMap[fromId] || fromId,
 
-        toId: creditors[j].userId,
-        toName: memberMap[creditors[j].userId] || creditors[j].userId,
+        toId,
+        toName: memberMap[toId] || toId,
 
-        amount: Math.round(pay * 100) / 100,
+        amount: roundedAmount,
+
+        // ✅ new fields for frontend button logic
+        hasPendingRequest: !!pendingId,
+        pendingRequestId: pendingId,
+
+        // ✅ permissions
+        canRequestPaid: myId === fromId && !pendingId,
+        canRemind: myId === toId,
       });
 
       debtors[i].amount -= pay;
@@ -96,20 +164,25 @@ exports.getSettlements = async (req, res) => {
       if (creditors[j].amount <= 0.00001) j++;
     }
 
-    // ✅ summary
-    const myId = req.user?._id?.toString();
-    const myBal = myId ? Number(balances[myId] || 0) : 0;
-
+    // ✅ FINAL RESPONSE
     return res.status(200).json({
       groupId,
       groupName: group.name,
-      members: group.members.map((m) => ({ _id: m._id, username: m.username })),
+
+      members: group.members.map((m) => ({
+        _id: m._id,
+        username: m.username,
+      })),
+
       balances,
+
       summary: {
         youGet: myBal > 0 ? Math.round(myBal * 100) / 100 : 0,
         youOwe: myBal < 0 ? Math.round(Math.abs(myBal) * 100) / 100 : 0,
       },
+
       settlements,
+      pending,
     });
   } catch (error) {
     console.error("Settlement error:", error);

@@ -56,6 +56,8 @@ export default function Login() {
 
             if (data.loggedIn) {
                 setUser(data.user);
+                localStorage.setItem("user", JSON.stringify(data.user));
+
                 navigate("/dashboard");
             } else {
                 setError("Login succeeded, but user session retrieval failed.");

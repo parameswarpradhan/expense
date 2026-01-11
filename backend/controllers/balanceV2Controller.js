@@ -3,14 +3,13 @@ const LedgerEntry = require("../models/LedgerEntry");
 
 exports.getGroupBalancesV2 = async (req, res) => {
   try {
-    const groupId = req.params.groupId || req.query.groupId || req.body.groupId;
+    const groupId = req.params.groupId;
     const myId = req.user._id.toString();
 
     if (!mongoose.Types.ObjectId.isValid(groupId)) {
       return res.status(400).json({ message: "Invalid groupId" });
     }
 
-    // ✅ read both EXPENSE + SETTLEMENT_COMPLETED
     const ledgerEntries = await LedgerEntry.find({
       groupId,
       status: "ACTIVE",
@@ -20,39 +19,30 @@ exports.getGroupBalancesV2 = async (req, res) => {
     const balances = {};
 
     for (const entry of ledgerEntries) {
-      // ✅ EXPENSE LOGIC
+      // ✅ EXPENSE
       if (entry.type === "EXPENSE_CREATED") {
-        const payerId = entry.data?.payer?.toString();
-        const amount = Number(entry.data?.amount || 0);
+        const payer = entry.data.payer.toString();
+        const amount = Number(entry.data.amount || 0);
 
-        if (!payerId || amount <= 0) continue;
+        balances[payer] = (balances[payer] || 0) + amount;
 
-        // payer gets credited
-        balances[payerId] = (balances[payerId] || 0) + amount;
-
-        // splits may be Map or object
-        let splitObj = entry.data?.splits || {};
+        let splitObj = entry.data.splits;
         if (splitObj instanceof Map) splitObj = Object.fromEntries(splitObj);
 
-        // everyone gets debited for their share
         for (const [uid, share] of Object.entries(splitObj || {})) {
-          const s = Number(share || 0);
-          balances[uid] = (balances[uid] || 0) - s;
+          balances[uid] = (balances[uid] || 0) - Number(share || 0);
         }
       }
 
-      // ✅ SETTLEMENT LOGIC
-      else if (entry.type === "SETTLEMENT_COMPLETED") {
-        const fromId = entry.data?.from?.toString();
-        const toId = entry.data?.to?.toString();
-        const amt = Number(entry.data?.amount || 0);
+      // ✅ SETTLEMENT COMPLETED
+      if (entry.type === "SETTLEMENT_COMPLETED") {
+        const fromId = entry.data.from?.toString();
+        const toId = entry.data.to?.toString();
+        const amt = Number(entry.data.amount || 0);
 
-        if (!fromId || !toId || amt <= 0) continue;
+        if (!fromId || !toId || !amt) continue;
 
-        // debtor pays => increases their balance (less negative)
         balances[fromId] = (balances[fromId] || 0) + amt;
-
-        // creditor receives => decreases their balance (less positive)
         balances[toId] = (balances[toId] || 0) - amt;
       }
     }

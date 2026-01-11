@@ -25,6 +25,7 @@ exports.adjustExpense = async (req, res) => {
       type: "EXPENSE_ADJUSTED",
       actor: payer,
       data: {
+        title,
         referenceId: expense._id,
         splits: expense.splits,
         amount: expense.amount
@@ -37,6 +38,7 @@ exports.adjustExpense = async (req, res) => {
       type: "EXPENSE_CREATED",
       actor: payer,
       data: {
+        title,
         payer,
         participants: Object.keys(splits),
         splits,
@@ -77,6 +79,7 @@ exports.reverseExpense = async (req, res) => {
       type: "EXPENSE_REVERSED",
       actor: expense.paidBy,
       data: {
+        title,
         referenceId: expense._id,
         splits: expense.splits,
         amount: expense.amount

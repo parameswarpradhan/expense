@@ -1,23 +1,16 @@
 const Group = require("../models/group");
 
-// const Group = require("../models/group");
-
 exports.createGroup = async (req, res) => {
   try {
     const { name, members } = req.body;
 
-    // ✅ Only name is mandatory
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Group name is required" });
     }
 
-    // ✅ owner comes from JWT
     const ownerId = req.user._id;
-
-    // ✅ members can be empty (invite-based UX)
     const incomingMembers = Array.isArray(members) ? members : [];
 
-    // ✅ ensure owner always included + no duplicates
     const uniqueMembers = Array.from(
       new Set([ownerId.toString(), ...incomingMembers.map(String)])
     );
@@ -37,6 +30,7 @@ exports.createGroup = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+
 exports.getGroupDetails = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -45,14 +39,17 @@ exports.getGroupDetails = async (req, res) => {
       .populate("owner", "username email")
       .populate("members", "username email");
 
-    if (!group) {
-      return res.status(404).json({ message: "Group not found" });
-    }
+    if (!group) return res.status(404).json({ message: "Group not found" });
 
-    return res.status(200).json(group);
+    // ✅ send clean structured response
+    return res.status(200).json({
+      _id: group._id,
+      name: group.name,
+      owner: group.owner,
+      members: group.members
+    });
   } catch (error) {
     console.error("Get group details error:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
