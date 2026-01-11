@@ -7,25 +7,26 @@ router.get("/health", (req, res) => {
 
 router.get("/health/db", async (req, res) => {
   try {
-    const state = mongoose.connection.readyState; 
+    const state = mongoose.connection.readyState;
     // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
 
-    res.json({
+    return res.json({
       ok: true,
       dbReadyState: state,
       connected: state === 1,
     });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
-});
+
 router.get("/health/env", (req, res) => {
-  res.json({
+  return res.json({
     ok: true,
-    hasMongo: !!process.env.MONGO_URI,
+    hasMongo: !!process.env.MONGO_URL,
     hasJwt: !!process.env.JWT_SECRET,
-    clientUrl: process.env.CLIENT_URL
+    clientUrl: process.env.CLIENT_URL || null,
   });
+});
 
 module.exports = router;
