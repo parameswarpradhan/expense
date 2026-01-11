@@ -22,7 +22,7 @@ export default function Login() {
         setIsSubmitting(true);
 
         try {
-            const loginResponse = await fetch(import.meta.env.VITE_API_URL1, {
+            const loginResponse = await fetch(`${import.meta.env.VITE_API_URL!}/login`, {
                 credentials: "include",
                 method: "POST",
                 headers: {
